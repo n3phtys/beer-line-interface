@@ -7,17 +7,20 @@ extern crate rustyline;
 #[macro_use]
 extern crate quick_error;
 
+
 extern crate blrustix;
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::io;
 use std::num::ParseIntError;
-use std::num::ParseFloatError;
+use blrustix::rustix_backend::WriteBackend;
 
 
 fn main() {
-    println!("Hello, world!");
+    println!("I am all the beerlist you will ever need!");
+
+    print_help();
 
     let mut backend = blrustix::default::build_transient_backend();
 
@@ -29,7 +32,7 @@ fn main() {
             Ok(line) => {
                 rl.add_history_entry(&line);
                 println!("Line: {}", line);
-                parse_line(line, &backend);
+                let _ = parse_line(line, &mut backend);
             },
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -63,68 +66,116 @@ quick_error! {
 }
 
 impl std::convert::From<std::num::ParseIntError> for CLIError {
-    fn from(t: std::num::ParseIntError) -> Self {
+    fn from(_: std::num::ParseIntError) -> Self {
         return CLIError::MyOwnError{name : "oh no!".to_string()};
     }
 }
 
 
 
+fn current_time_seconds() -> u32 {
+    return 123456789u32;
+}
+
+fn print_help() -> () {
+    println!("
+Possible Commands:
 
 //create user <name>
-//create item <name> <price_cents>
-//create item <name> <price_cents> <category>
+//create item <name> <price_cents: u32>
+//create item <name> <price_cents: u32> <category>
+//buy <user_id: u32> <item_id: u32>
 //make bill <comment>
-//delete item <id>
-//delete user <id>
+//delete item <id: u32>
+//delete user <id: u32>
 //print
 //help
-//exit
+//exit")
+}
 
-fn parse_line(line: String, mut backend: &blrustix::rustix_backend::RustixBackend<blrustix::persistencer::TransientPersister>) -> Result<(), CLIError> {
+
+fn parse_line(line: String, backend: &mut blrustix::rustix_backend::RustixBackend<blrustix::persistencer::TransientPersister>) -> Result<(), CLIError> {
     let v: Vec<&str> = line.trim().split(" ").collect();
     let v = v.into_iter().filter(|&s|s.trim().len() > 0).collect::<Vec<&str>>();
     match v.len() {
         1usize => {
-            println!("Only one element: {:?}", v);
+            //println!("Only one element: {:?}", v);
             match v[0].as_ref() {
-                "exit" => Ok(()),
-                "help" => Ok(()),
+                "exit" => std::process::exit(0),
+                "help" => Ok(print_help()),
                 "print" => Ok(output_data(backend)),
                 _ => Ok(println!("could not read text: {:?}", v[0])),
             }
         },
         2usize => {
-            println!("Two elements");
+            //println!("Two elements");
             match v[0] {_ => Ok(()),}
         },
         3usize => {
-            println!("Three elements");
-            let (letter, x1, x2) = (v[0], v[1], v[2]);
-            match letter {
-                "make" => Ok(()),
-                "delete" => Ok(()),
-                "create" => Ok(()),
+            //println!("Three elements");
+            match v[0].as_ref() {
+                "make" =>  {
+                    match v[1].as_ref() {
+                        "bill" => {
+                            let ts = current_time_seconds();
+                            backend.create_bill(ts,  blrustix::datastore::UserGroup::AllUsers, v[2].to_string());
+                            Ok(())
+                        },
+                        _ => Ok(()),
+                    }
+                },
+                "delete" => {
+                    match v[1].as_ref() {
+                        "user" => {
+                            let user_id = try!(v[2].parse::<u32>());
+                            backend.delete_user(user_id);
+                            Ok(())
+                        },
+                        "item" => {
+                            let item_id = try!(v[2].parse::<u32>());
+                            backend.delete_item(item_id);
+                            Ok(())
+                        },
+                    _ => Ok(()),
+                }},
+                "create" => {
+                    match v[1].as_ref() {
+                        "user" => {
+                            backend.create_user(v[2].to_string());
+                            Ok(())
+                        },
+                        _ => Ok(()),
+                    }
+
+                },
+                "buy" => {
+                    let user_id = try!(v[1].parse::<u32>());
+                    let item_id = try!(v[2].parse::<u32>());
+
+                    let ts = current_time_seconds();
+                    backend.purchase(user_id, item_id, ts);
+                    Ok(())
+                },
                 _ => Ok(()),
             }
         },
         4usize => {
-            println!("Four elements");
-            let (letter, x1, x2, x3) = (v[0], v[1], v[2], v[3]);
-            if letter == "create" && x1 == "item" {
-                let name = v[2];
+            //println!("Four elements");
+            if v[0] == "create" && v[1] == "item" {
+                let name = v[2].to_string();
                 let price_float = try!(v[3].parse::<u32>());
+                backend.create_item(name, price_float, None);
             }
             Ok(())
             // ...
         },
         5usize => {
-            println!("Five elements");
-            let (letter, x1, x2, x3, x4) = (v[0], v[1], v[2], v[3], v[4]);
-            if letter == "create" && x1 == "item" {
-                let name = v[2];
+            //println!("Five elements");
+            if v[0] == "create" && v[1] == "item" {
+                let name = v[2].to_string();
                 let price_float = try!(v[3].parse::<u32>());
                 let category = v[4];
+                backend.create_item(name, price_float, Some(category.to_string()));
             }
             Ok(())
 

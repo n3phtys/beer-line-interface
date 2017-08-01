@@ -5,6 +5,7 @@ version = "0.1.0"
 [dependencies]
 quick-error = "1.2.0"
 rustyline = "1.0.0"
+time = "0.1.38"
 
 [dependencies.blrustix]
 git = "https://github.com/n3phtys/rustix-bl"
