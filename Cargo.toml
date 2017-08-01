@@ -1,0 +1,10 @@
+[package]
+authors = ["nephtys <christopher.kaag@gmail.com>"]
+name = "rustix-cli"
+version = "0.1.0"
+[dependencies]
+quick-error = "1.2.0"
+rustyline = "1.0.0"
+
+[dependencies.blrustix]
+git = "https://github.com/n3phtys/rustix-bl"
