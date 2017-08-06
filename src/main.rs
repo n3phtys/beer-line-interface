@@ -22,7 +22,9 @@ fn main() {
 
     print_help();
 
-    let mut backend = blrustix::default::build_transient_backend();
+    let mut backend = blrustix::build_persistent_backend(std::path::Path::new(".")).unwrap();
+
+    println!("{:?}", backend.reload());
 
     // `()` can be used when no completer is required
     let mut rl = Editor::<()>::new();
@@ -33,18 +35,18 @@ fn main() {
                 rl.add_history_entry(&line);
                 println!("Line: {}", line);
                 let _ = parse_line(line, &mut backend);
-            },
+            }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
-                break
-            },
+                break;
+            }
             Err(ReadlineError::Eof) => {
                 println!("CTRL-D");
-                break
-            },
+                break;
+            }
             Err(err) => {
                 println!("Error: {:?}", err);
-                break
+                break;
             }
         }
     }
@@ -67,7 +69,9 @@ quick_error! {
 
 impl std::convert::From<std::num::ParseIntError> for CLIError {
     fn from(_: std::num::ParseIntError) -> Self {
-        return CLIError::MyOwnError{name : "oh no!".to_string()};
+        return CLIError::MyOwnError {
+            name: "oh no!".to_string(),
+        };
     }
 }
 
@@ -78,7 +82,8 @@ fn current_time_seconds() -> u32 {
 }
 
 fn print_help() -> () {
-    println!("
+    println!(
+        "
 Possible Commands:
 
 //create user <name>
@@ -90,13 +95,19 @@ Possible Commands:
 //delete user <id: u32>
 //print
 //help
-//exit")
+//exit"
+    )
 }
 
 
-fn parse_line(line: String, backend: &mut blrustix::rustix_backend::RustixBackend<blrustix::persistencer::TransientPersister>) -> Result<(), CLIError> {
+fn parse_line(
+    line: String,
+    backend: &mut blrustix::rustix_backend::RustixBackend<blrustix::persistencer::FilePersister>,
+) -> Result<(), CLIError> {
     let v: Vec<&str> = line.trim().split(" ").collect();
-    let v = v.into_iter().filter(|&s|s.trim().len() > 0).collect::<Vec<&str>>();
+    let v = v.into_iter()
+        .filter(|&s| s.trim().len() > 0)
+        .collect::<Vec<&str>>();
     match v.len() {
         1usize => {
             //println!("Only one element: {:?}", v);
@@ -106,47 +117,47 @@ fn parse_line(line: String, backend: &mut blrustix::rustix_backend::RustixBacken
                 "print" => Ok(output_data(backend)),
                 _ => Ok(println!("could not read text: {:?}", v[0])),
             }
-        },
+        }
         2usize => {
             //println!("Two elements");
-            match v[0] {_ => Ok(()),}
-        },
+            match v[0] {
+                _ => Ok(()),
+            }
+        }
         3usize => {
             //println!("Three elements");
             match v[0].as_ref() {
-                "make" =>  {
-                    match v[1].as_ref() {
-                        "bill" => {
-                            let ts = current_time_seconds();
-                            backend.create_bill(ts,  blrustix::datastore::UserGroup::AllUsers, v[2].to_string());
-                            Ok(())
-                        },
-                        _ => Ok(()),
+                "make" => match v[1].as_ref() {
+                    "bill" => {
+                        let ts = current_time_seconds();
+                        backend.create_bill(
+                            ts,
+                            blrustix::datastore::UserGroup::AllUsers,
+                            v[2].to_string(),
+                        );
+                        Ok(())
                     }
-                },
-                "delete" => {
-                    match v[1].as_ref() {
-                        "user" => {
-                            let user_id = try!(v[2].parse::<u32>());
-                            backend.delete_user(user_id);
-                            Ok(())
-                        },
-                        "item" => {
-                            let item_id = try!(v[2].parse::<u32>());
-                            backend.delete_item(item_id);
-                            Ok(())
-                        },
                     _ => Ok(()),
-                }},
-                "create" => {
-                    match v[1].as_ref() {
-                        "user" => {
-                            backend.create_user(v[2].to_string());
-                            Ok(())
-                        },
-                        _ => Ok(()),
+                },
+                "delete" => match v[1].as_ref() {
+                    "user" => {
+                        let user_id = try!(v[2].parse::<u32>());
+                        backend.delete_user(user_id);
+                        Ok(())
                     }
-
+                    "item" => {
+                        let item_id = try!(v[2].parse::<u32>());
+                        backend.delete_item(item_id);
+                        Ok(())
+                    }
+                    _ => Ok(()),
+                },
+                "create" => match v[1].as_ref() {
+                    "user" => {
+                        backend.create_user(v[2].to_string());
+                        Ok(())
+                    }
+                    _ => Ok(()),
                 },
                 "buy" => {
                     let user_id = try!(v[1].parse::<u32>());
@@ -155,10 +166,10 @@ fn parse_line(line: String, backend: &mut blrustix::rustix_backend::RustixBacken
                     let ts = current_time_seconds();
                     backend.purchase(user_id, item_id, ts);
                     Ok(())
-                },
+                }
                 _ => Ok(()),
             }
-        },
+        }
         4usize => {
             //println!("Four elements");
             if v[0] == "create" && v[1] == "item" {
@@ -168,7 +179,7 @@ fn parse_line(line: String, backend: &mut blrustix::rustix_backend::RustixBacken
             }
             Ok(())
             // ...
-        },
+        }
         5usize => {
             //println!("Five elements");
             if v[0] == "create" && v[1] == "item" {
@@ -179,11 +190,13 @@ fn parse_line(line: String, backend: &mut blrustix::rustix_backend::RustixBacken
             }
             Ok(())
 
-        },
+        }
         _ => Ok(println!("Understood nothing, see vector = {:?}", v)),
     }
 }
 
-fn output_data(backend: &blrustix::rustix_backend::RustixBackend<blrustix::persistencer::TransientPersister>) {
+fn output_data(
+    backend: &blrustix::rustix_backend::RustixBackend<blrustix::persistencer::FilePersister>,
+) {
     println!("Output:\n{:#?}", backend);
 }

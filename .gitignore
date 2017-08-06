@@ -3,3 +3,5 @@
 .idea/
 .idea/libraries/Cargo_rustix__cli.xml
 rustix-cli.iml
+data.mdb
+lock.mdb
